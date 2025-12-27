@@ -1,10 +1,9 @@
 use atoi::atoi;
+use clap::Parser;
 use itertools::Itertools;
 use memmap2::{Mmap, MmapOptions};
 use std::collections::HashMap;
 use std::fs::File;
-
-use clap::Parser;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -12,56 +11,51 @@ struct Args {
     input: String,
 }
 
+struct Statistics {
+    max: i16,
+    min: i16,
+    avg: i16,
+    count: i16,
+}
+
 fn main() {
     let args = Args::parse();
-    let mut temp_maxes: HashMap<String, i16> = HashMap::new();
-    let mut temp_mins: HashMap<String, i16> = HashMap::new();
-    let mut temp_avgs: HashMap<String, i16> = HashMap::new();
-    let mut temp_counts: HashMap<String, i16> = HashMap::new();
+    let mut temp_statistics: HashMap<String, Statistics> = HashMap::new();
     let file = File::open(args.input).unwrap();
     let mmap: Mmap = unsafe { MmapOptions::new().map(&file).unwrap() };
-    #[cfg(target_os = "linux")]
-    match mmap.advise(memmap2::Advice::Sequential) {
-        Ok(x) => x,
-        Err(x) => panic!("{}", x),
-    }
     for (city_name_raw, temp_raw) in mmap.split(|&b| b == b'\n' || b == b';').tuples() {
         let city_name: &str = unsafe { str::from_utf8_unchecked(city_name_raw) };
         let temp: i16 = atoi_times_ten(temp_raw);
-        if let Some(val) = temp_maxes.get(city_name) {
-            if *val < temp {
-                temp_maxes.insert(city_name.to_owned(), temp);
-            }
+        if let Some(val) = temp_statistics.get_mut(city_name) {
+            (*val).max = std::cmp::max((*val).max, temp);
+            (*val).min = std::cmp::min((*val).min, temp);
+            (*val).avg += temp;
+            (*val).count += 1;
         } else {
-            temp_maxes.insert(city_name.to_owned(), temp);
+            temp_statistics.insert(
+                city_name.to_owned(),
+                Statistics {
+                    max: temp,
+                    min: temp,
+                    avg: temp,
+                    count: 1,
+                },
+            );
         }
-        if let Some(val) = temp_mins.get(city_name) {
-            if *val > temp {
-                temp_mins.insert(city_name.to_owned(), temp);
-            }
-        } else {
-            temp_mins.insert(city_name.to_owned(), temp);
-        }
-        let count = temp_counts.entry(city_name.to_owned()).or_insert(0);
-        if let Some(val) = temp_avgs.get_mut(city_name) {
-            *val += temp;
-        } else {
-            temp_avgs.insert(city_name.to_owned(), temp);
-        }
-        *count += 1;
     }
 
-    let mut keys: Vec<_> = temp_maxes.keys().collect();
+    let mut keys: Vec<_> = temp_statistics.keys().collect();
     keys.sort();
     let mut out_msg = "{".to_owned();
     for key in keys {
+        let stat = temp_statistics.get(key).unwrap();
         out_msg = format!(
             "{}{}={:.1}/{:.1}/{:.1},",
             out_msg,
             key,
-            *temp_mins.get(key).unwrap() as f32 * 0.1,
-            *temp_avgs.get(key).unwrap() as f32 / *temp_counts.get(key).unwrap() as f32 * 0.1,
-            *temp_maxes.get(key).unwrap() as f32 * 0.1,
+            stat.min as f32 * 0.1,
+            stat.avg as f32 / stat.count as f32 * 0.1,
+            stat.max as f32 * 0.1,
         );
     }
     println!("{}}}", &out_msg[..out_msg.len() - 1]);
