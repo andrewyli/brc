@@ -12,6 +12,5 @@ memmap2 = { version = "0.9.9" }
 [profile.profiled]
 inherits = "release"
 opt-level = 3
-debug = 1
+debug = 2
 strip = "none"
-force-frame-pointers = true
