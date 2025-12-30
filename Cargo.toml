@@ -8,6 +8,7 @@ atoi = "2.0.0"
 clap = { version = "4.5.53", features = ["derive"] }
 itertools = "0.14.0"
 memmap2 = { version = "0.9.9" }
+rapidhash = { version = "4.2.0" }
 
 [profile.profiled]
 inherits = "release"

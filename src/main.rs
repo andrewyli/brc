@@ -1,8 +1,8 @@
-use atoi::atoi;
 use clap::Parser;
 use itertools::Itertools;
 use memmap2::{Mmap, MmapOptions};
-use std::collections::HashMap;
+use rapidhash::RapidHashMap;
+use std::fmt;
 use std::fs::File;
 
 #[derive(Parser, Debug)]
@@ -14,13 +14,28 @@ struct Args {
 struct Statistics {
     max: i16,
     min: i16,
-    avg: i16,
-    count: i16,
+    avg: i64,
+    count: u32,
+}
+
+impl fmt::Display for Statistics {
+    // This function must match this signature exactly
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Use write! (with a 'w') to send output to the formatter 'f'
+        // It works exactly like println!
+        write!(
+            f,
+            "{:.1}/{:.1}/{:.1}",
+            self.min as f32 * 0.1,
+            self.avg as f32 / self.count as f32 * 0.1,
+            self.max as f32 * 0.1
+        )
+    }
 }
 
 fn main() {
     let args = Args::parse();
-    let mut temp_statistics: HashMap<String, Statistics> = HashMap::new();
+    let mut temp_statistics: RapidHashMap<String, Statistics> = RapidHashMap::default();
     let file = File::open(args.input).unwrap();
     let mmap: Mmap = unsafe { MmapOptions::new().map(&file).unwrap() };
     for (city_name_raw, temp_raw) in mmap.split(|&b| b == b'\n' || b == b';').tuples() {
@@ -29,7 +44,7 @@ fn main() {
         if let Some(val) = temp_statistics.get_mut(city_name) {
             (*val).max = std::cmp::max((*val).max, temp);
             (*val).min = std::cmp::min((*val).min, temp);
-            (*val).avg += temp;
+            (*val).avg += temp as i64;
             (*val).count += 1;
         } else {
             temp_statistics.insert(
@@ -37,7 +52,7 @@ fn main() {
                 Statistics {
                     max: temp,
                     min: temp,
-                    avg: temp,
+                    avg: temp as i64,
                     count: 1,
                 },
             );
@@ -49,20 +64,23 @@ fn main() {
     let mut out_msg = "{".to_owned();
     for key in keys {
         let stat = temp_statistics.get(key).unwrap();
-        out_msg = format!(
-            "{}{}={:.1}/{:.1}/{:.1},",
-            out_msg,
-            key,
-            stat.min as f32 * 0.1,
-            stat.avg as f32 / stat.count as f32 * 0.1,
-            stat.max as f32 * 0.1,
-        );
+        out_msg = format!("{}{}={},", out_msg, key, stat);
     }
     println!("{}}}", &out_msg[..out_msg.len() - 1]);
 }
 
 pub fn atoi_times_ten(s: &[u8]) -> i16 {
-    atoi::<i16>(&s[..s.len() - 2]).unwrap_or(0) * 10 + (s[s.len() - 1] - b'0') as i16
+    let is_negative = s[0] == b'-';
+    let offset = is_negative as usize;
+    let length = s.len();
+    let val = if length - offset == 3 {
+        (s[offset] - b'0') as i16 * 10 + (s[offset + 2] - b'0') as i16
+    } else {
+        (s[offset] - b'0') as i16 * 100
+            + (s[offset + 1] - b'0') as i16 * 10
+            + (s[offset + 3] - b'0') as i16
+    };
+    if is_negative { -val } else { val }
 }
 
 #[cfg(test)]
