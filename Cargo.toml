@@ -7,8 +7,14 @@ edition = "2024"
 atoi = "2.0.0"
 clap = { version = "4.5.53", features = ["derive"] }
 itertools = "0.14.0"
+memchr = "2.7.6"
 memmap2 = { version = "0.9.9" }
 rapidhash = { version = "4.2.0" }
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "fat"
 
 [profile.profiled]
 inherits = "release"
@@ -16,3 +22,7 @@ opt-level = 3
 debug = 1
 strip = "none"
 force-frame-pointers = true
+lto = "off"
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=native"]
